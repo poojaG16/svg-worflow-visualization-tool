@@ -1,1 +1,53 @@
-<p>svg-canvas works!</p>
+<div class="toolBox d-flex m-2">
+    <button type="button" class="btn btn-primary" mdbRipple (click)="addNode()">Button</button>
+</div>
+<svg #canvas width="100%" height="100vh" (wheel)="onWheel($event)" (mousedown)="onMouseDown($event)"
+    (mousemove)="onMouseMove($event)" (mouseup)="onMouseUp($event)">
+  
+    <!-- Grid pattern definitions -->
+  <defs>
+    <pattern id="smallGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#ddd" stroke-width="1" />
+    </pattern>
+    <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+      <rect width="100" height="100" fill="url(#smallGrid)" />
+      <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#ccc" stroke-width="1" />
+    </pattern>
+  </defs>
+
+  <!-- Fixed grid background (not inside pan/zoom group) -->
+  <rect width="100%" height="100%" fill="url(#grid)" />
+    <g [attr.transform]="'translate(' + pan().x + ',' + pan().y + ') scale(' + zoom() + ')'">
+
+        <!-- Define arrow marker for connectors -->
+        <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"
+                markerUnits="strokeWidth">
+                <polygon points="0 0, 10 3.5, 0 7" fill="black" />
+            </marker>
+        </defs>
+
+
+
+        <!-- Bezier connectors -->
+        <path *ngFor="let conn of connectors()" [attr.d]="getBezierPath(conn)" stroke="black" stroke-width="2"
+            fill="none" marker-end="url(#arrowhead)" />
+
+        <!-- Nodes -->
+        <g *ngFor="let node of nodes()">
+            <!-- Render node box -->
+            <circle [attr.cx]="node.x" [attr.cy]="node.y" [attr.r]="node.radius || 60" fill="#b79fed" stroke="black"
+                (mousedown)="startDrag($event, node)" />
+
+            <!-- Node name -->
+            <text [attr.x]="node.x" [attr.y]="node.y" text-anchor="middle" font-size="12" fill="white">{{ node.name
+                }}</text>
+
+            <!-- Ports -->
+            <circle *ngFor="let port of node.ports" [attr.cx]="node.x + port.x" [attr.cy]="node.y + port.y" r="5"
+                [attr.fill]="port.type === 'input' ? 'green' : 'red'"
+                (click)="handlePortClick({ nodeId: node.id, port: port })" />
+        </g>
+
+    </g>
+</svg>
