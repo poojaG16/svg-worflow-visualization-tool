@@ -11,42 +11,26 @@ import { graph } from '../../../../assets/graph';
   templateUrl: './svg-canvas.component.html',
   styleUrl: './svg-canvas.component.scss'
 })
-export class SvgCanvasComponent implements OnInit{
+export class SvgCanvasComponent implements OnInit {
 
   @ViewChild('canvas', { static: true }) canvas!: ElementRef<SVGSVGElement>;
 
+  initialNodes: Node[] = [];
+  initialConnectors: Connector[] = [];
+
   testnodes: any = [
-    {
-      name: 'Node 1',
-      id: 'node-1',
-      x: 100,
-      y: 100,
-      ports: [
-        { id: 'out-1', type: 'output', x: 40, y: 0 }, // right center
-      ]
-    },
-    {
-      name: 'Node 2',
-      id: 'node-2',
-      x: 400,
-      y: 100,
-      ports: [
-        { id: 'in-2', type: 'input', x: -40, y: 0 }, // left center
-      ]
-    }
+    { id: '1', name: 'Start' },
+    { id: '2', name: 'Extract', inputs: ['1'] },
+    { id: '3', name: 'Transform', inputs: ['2'] },
+    { id: '4', name: 'Load', inputs: ['3'] },
+    { id: '5', name: 'End', inputs: ['4'] }
   ];
 
-  testConnector = [{
-    id: 'conn-1',
-    fromNodeId: 'node-1',
-    fromPortId: 'out-1',
-    toNodeId: 'node-2',
-    toPortId: 'in-2',
-  }];
   nodes = signal<Node[]>([]);
   connectors = signal<Connector[]>([]);
 
   draggingFrom: { nodeId: string; port: Port } | null = null;
+  tempConnector: { x: number; y: number } | null = null;
 
   //zoom and pann
   zoom = signal(1);
@@ -57,22 +41,27 @@ export class SvgCanvasComponent implements OnInit{
   private draggingNode: Node | null = null;
   private isPanning = false;
   private panStart = { x: 0, y: 0 };
+  
   offsetX: number = 0;
   offsetY: number = 0;
 
   ngOnInit(): void {
-    const graphData:any = graph;
-    const flatNodes = graphData.filter((e:any)=> e.node).map(
-      (e : any)=>({
+    const graphData: any = graph;
+    const flatNodes = graphData.filter((e: any) => e.node).map(
+      (e: any) => ({
         ...e.node,
         ports: e.ports || []
       })
     )
 
-    const flattenConnectors = graphData.find((e:any) => e.connectors)?.connectors || [];
+    const flattenConnectors = graphData.find((e: any) => e.connectors)?.connectors || [];
+    const objectGraph = this.generateGraphLayout(this.testnodes);
+    this.nodes.set(objectGraph.node);
+    this.connectors.set(objectGraph.connectors);
 
-    this.nodes.set(flatNodes);
-    this.connectors.set(flattenConnectors);
+    // Store the initial state
+    this.initialNodes = JSON.parse(JSON.stringify(objectGraph.node));
+    this.initialConnectors = JSON.parse(JSON.stringify(objectGraph.connectors));
   }
 
   //add node 
@@ -91,9 +80,62 @@ export class SvgCanvasComponent implements OnInit{
     }
 
     this.nodes.update(nodes => [...nodes, newNode]);
+    this.initialConnectors = JSON.parse(JSON.stringify(this.connectors()));
+    this.initialNodes = JSON.parse(JSON.stringify(this.nodes()));
     console.log(this.nodes());
   }
 
+  //create graph layout
+  generateGraphLayout(graphInput: any[]) {
+    const nodeMap: Record<string, Node> = {};
+    const spacingX = 250; // Horizontal spacing between nodes
+    const yOffset = 100;  // Fixed vertical position for all nodes
+
+    // Assign positions to nodes
+    graphInput.forEach((n, index) => {
+      const x = index * spacingX + 100; // Increment x-coordinate for each node
+      const y = yOffset; // Keep y-coordinate constant
+
+      nodeMap[n.id] = {
+        id: n.id,
+        name: n.name,
+        x: x,
+        y: y,
+        ports: [
+          { id: n.id + '_in', type: 'input', x: -40, y: 0 },
+          { id: n.id + '_out', type: 'output', x: 40, y: 0 }
+        ],
+        radius: 40
+      };
+    });
+
+    // Create connectors
+    const connectors: Connector[] = [];
+    graphInput.forEach(node => {
+      if (node.inputs) {
+        node.inputs.forEach((inputId: string) => {
+          connectors.push({
+            fromNodeId: inputId,
+            fromPortId: nodeMap[inputId].ports.find(p => p.type === 'output')?.id || '',
+            toNodeId: node.id,
+            toPortId: nodeMap[node.id].ports.find(p => p.type === 'input')?.id || '',
+            id: `conn-${inputId}-${node.id}`
+          });
+        });
+      }
+    });
+
+    return {
+      node: Object.values(nodeMap),
+      connectors
+    };
+  }
+
+  resetGraph() {
+    console.log(this.nodes());
+    this.nodes.set(this.initialNodes);
+    this.connectors.set(this.initialConnectors);
+  }
 
   startDrag(event: MouseEvent, node: Node) {
     this.draggingNode = node;
@@ -129,6 +171,10 @@ export class SvgCanvasComponent implements OnInit{
       this.panStart = { x: event.clientX, y: event.clientY };
     } else if (this.draggingNode) {
       this.onDrag(event);
+    }else if (this.draggingFrom) {
+        // Update temporary connector position
+        const svgCoords = this.getSvgCoords(event);
+        this.tempConnector = { x: svgCoords.x, y: svgCoords.y };
     }
   }
 
@@ -145,6 +191,7 @@ export class SvgCanvasComponent implements OnInit{
   onMouseUp(event: MouseEvent) {
     this.isPanning = false;
     this.stopDrag();
+    this.tempConnector = null; // Reset temporary connector
   }
 
   stopDrag() {
@@ -168,22 +215,27 @@ export class SvgCanvasComponent implements OnInit{
     if (port.type === 'output') {
       this.draggingFrom = { nodeId, port };
     } else if (port.type === 'input' && this.draggingFrom) {
-      const toNodeId = nodeId;
-      const toPort = port;
-      const from = this.draggingFrom;
+      // Complete the connection to the input port
+      this.createConnector(this.draggingFrom, { nodeId, port });
+      this.draggingFrom = null; // Reset dragging state
+    } 
+  }
 
-      //create new connector
-      const newConnector: Connector = {
-        id: `conn-${Date.now()}`,
+  createConnector(from: { nodeId: string; port: Port }, to: { nodeId: string; port: Port }) {
+    const newConnector: Connector = {
         fromNodeId: from.nodeId,
         fromPortId: from.port.id,
-        toNodeId: toNodeId,
-        toPortId: toPort.id,
-      };
-    } else {
-      this.draggingFrom = null;
-    }
-  }
+        toNodeId: to.nodeId,
+        toPortId: to.port.id,
+        id: `conn-${from.nodeId}-${to.nodeId}`
+    };
+
+    // Update the connectors in the graph
+    this.connectors.update(connectors => [...connectors, newConnector]);
+    this.initialConnectors = JSON.parse(JSON.stringify(this.connectors()));
+    this.initialNodes = JSON.parse(JSON.stringify(this.nodes()));
+    console.log('Connector created:', newConnector);
+}
 
   getPortAbsolutePosition(nodeId: string, portId: string) {
     const node = this.nodes().find(n => n.id === nodeId);
