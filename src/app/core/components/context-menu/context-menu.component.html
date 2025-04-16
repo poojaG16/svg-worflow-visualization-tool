@@ -1,1 +1,8 @@
-<p>context-menu works!</p>
+<div class="context-menu" *ngIf="visible" [style.left.px]="position.x" [style.top.px]="position.y">
+  <ul>
+    <li *ngFor="let option of options" (click)="onOptionClick(option.action)">
+        <i [class]="option.icon"></i>
+      {{ option.label }}
+    </li>
+  </ul>
+</div>

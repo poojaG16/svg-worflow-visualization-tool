@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { Node, Port } from '../../../models/node.model';
 import { Connector } from '../../../models/connector.model';
 import { graph } from '../../../../assets/graph';
+import { ContextMenuComponent } from '../../../core/components/context-menu/context-menu.component';
 
 @Component({
   selector: 'app-svg-canvas',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ContextMenuComponent],
   templateUrl: './svg-canvas.component.html',
   styleUrl: './svg-canvas.component.scss'
 })
@@ -46,6 +47,13 @@ export class SvgCanvasComponent implements OnInit {
   offsetX: number = 0;
   offsetY: number = 0;
 
+  //conext menu properties
+  contextMenuVisible = false;
+  contextMenuPosition = { x: 0, y: 0 };
+  selectedNode: Node | null = null;
+  contextMenuOptions: { label: string; icon: string, action: () => void }[] = [];
+
+
   ngOnInit(): void {
     const graphData: any = graph;
     const flatNodes = graphData.filter((e: any) => e.node).map(
@@ -66,6 +74,8 @@ export class SvgCanvasComponent implements OnInit {
 
     //global keydown event listener
     window.addEventListener('keydown', this.onKeyDown.bind(this));
+    //context menu event listener
+    window.addEventListener('click', this.closeContextMenu.bind(this));
   }
 
   //key event for delete and add node
@@ -109,6 +119,64 @@ export class SvgCanvasComponent implements OnInit {
     this.initialConnectors = JSON.parse(JSON.stringify(this.connectors()));
     this.initialNodes = JSON.parse(JSON.stringify(this.nodes()));
     console.log(this.nodes());
+  }
+
+  //context menu for node
+  openContextMenu(event: MouseEvent, node: Node) {
+    event.preventDefault();//prevent default browser context menu
+    this.contextMenuVisible = true;
+    this.contextMenuPosition = { x: event.clientX, y: event.clientY };
+    this.selectedNode = node;
+    console.log('Selected Node:', node, this.contextMenuPosition, this.contextMenuVisible);
+
+    // Define dynamic options for the context menu
+    this.contextMenuOptions = [
+      {
+        label: 'Edit',
+        action: () => this.editNode(node),
+        icon: 'bi bi-pencil' // Font Awesome icon class
+      },
+      {
+        label: 'Rename',
+        action: () => this.renameNode(node),
+        icon: 'bi bi-textarea-resize' // Font Awesome icon class
+      },
+      {
+        label: 'Delete',
+        action: () => this.deleteNode(node),
+        icon: 'bi bi-trash' // Font Awesome icon class
+      }
+    ];
+  }
+
+  closeContextMenu() {
+    this.contextMenuVisible = false;
+    this.selectedNode = null;
+  }
+
+  editNode(node: Node) {
+    console.log('Edit node:', node);
+    // Add your edit logic here
+  }
+
+  renameNode(node: Node) {
+    const newName = prompt('Enter new name for the node:', node.name);
+    if (newName) {
+      this.nodes.update(nodes =>
+        nodes.map(n => n.id === node.id ? { ...n, name: newName } : n)
+      );
+      console.log('Node renamed:', node);
+    }
+  }
+
+  deleteNode(node: Node) {
+    this.nodes.update(nodes => nodes.filter(n => n.id !== node.id));
+    //delete connectors also
+    this.connectors.update(connectors =>
+      connectors.filter(conn => conn.fromNodeId !== node.id && conn.toNodeId !== node.id)
+    );
+    this.initialConnectors = JSON.parse(JSON.stringify(this.connectors()));
+    console.log('Node deleted:', node);
   }
 
   //create graph layout
@@ -342,5 +410,7 @@ export class SvgCanvasComponent implements OnInit {
 
   ngOnDestroy(): void {
     window.removeEventListener('keydown', this.onKeyDown.bind(this));
+    window.removeEventListener('click', this.closeContextMenu.bind(this));
+
   }
 }
