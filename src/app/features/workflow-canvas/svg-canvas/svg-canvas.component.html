@@ -1,5 +1,5 @@
 <div class="toolBox d-flex m-2">
-    <button type="button" class="btn btn-primary" mdbRipple (click)="addNode()">Button</button>
+    <button type="button" class="btn btn-primary" mdbRipple (click)="addNode()">Add Node</button>
     <button type="button" class="btn btn-primary" (click)="resetGraph()">Reset</button>
 </div>
 <svg #canvas width="100%" height="100vh" (wheel)="onWheel($event)" (mousedown)="onMouseDown($event)"
@@ -24,14 +24,14 @@
         <defs>
             <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"
                 markerUnits="strokeWidth">
-                <polygon points="0 0, 10 3.5, 0 7" fill="black" />
+                <polygon points="0 0, 10 3.5, 0 7" fill="black"/>
             </marker>
         </defs>
 
 
         <!-- Bezier connectors -->
-        <path *ngFor="let conn of connectors()" [attr.d]="getBezierPath(conn)" stroke="black" stroke-width="2"
-            fill="none" marker-end="url(#arrowhead)" />
+        <path *ngFor="let conn of connectors()" [attr.d]="getBezierPath(conn)" [attr.stroke]="conn === selectedConnector ? 'red' : 'black'" [attr.stroke-width]="2"
+            fill="none" marker-end="url(#arrowhead)" (click)="selectConnector(conn)" />
 
         <path *ngIf="tempConnector"
             [attr.d]="'M' + getPortPosition(draggingFrom?.nodeId || '', draggingFrom?.port?.id || '').x + ',' + getPortPosition(draggingFrom?.nodeId || '', draggingFrom?.port?.id || '').y + ' L' + tempConnector.x + ',' + tempConnector.y"
@@ -44,12 +44,12 @@
                 (mousedown)="startDrag($event, node)" />
 
             <!-- Node name -->
-            <text [attr.x]="node.x" [attr.y]="node.y" text-anchor="middle" font-size="12" fill="white">{{ node.name
+            <text [attr.x]="node.x" [attr.y]="node.y" text-anchor="middle" font-size="12" fill="black">{{ node.name
                 }}</text>
 
             <!-- Ports -->
             <circle *ngFor="let port of node.ports" [attr.cx]="node.x + port.x" [attr.cy]="node.y + port.y" r="5"
-                [attr.fill]="port.type === 'input' ? 'green' : 'red'"
+                [attr.fill]="port.type === 'input' ? 'green' : 'blue'"
                 (click)="handlePortClick({ nodeId: node.id, port: port })" />
         </g>
 

@@ -31,6 +31,7 @@ export class SvgCanvasComponent implements OnInit {
 
   draggingFrom: { nodeId: string; port: Port } | null = null;
   tempConnector: { x: number; y: number } | null = null;
+  selectedConnector: Connector | null = null;
 
   //zoom and pann
   zoom = signal(1);
@@ -41,7 +42,7 @@ export class SvgCanvasComponent implements OnInit {
   private draggingNode: Node | null = null;
   private isPanning = false;
   private panStart = { x: 0, y: 0 };
-  
+
   offsetX: number = 0;
   offsetY: number = 0;
 
@@ -62,6 +63,31 @@ export class SvgCanvasComponent implements OnInit {
     // Store the initial state
     this.initialNodes = JSON.parse(JSON.stringify(objectGraph.node));
     this.initialConnectors = JSON.parse(JSON.stringify(objectGraph.connectors));
+
+    //global keydown event listener
+    window.addEventListener('keydown', this.onKeyDown.bind(this));
+  }
+
+  //key event for delete and add node
+  onKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Delete' && this.selectedConnector) {
+      this.deleteSelectedConnector();
+    }
+  }
+
+  selectConnector(connector: Connector) {
+    this.selectedConnector = connector;
+    console.log('Selected Connector:', connector);
+  }
+
+  deleteSelectedConnector() {
+    if (this.selectedConnector) {
+      this.connectors.update(connectors =>
+        connectors.filter(conn => conn.id !== this.selectedConnector!.id)
+      );
+      this.selectedConnector = null; // Reset selected connector
+      this.initialConnectors = JSON.parse(JSON.stringify(this.connectors()));
+    }
   }
 
   //add node 
@@ -171,10 +197,10 @@ export class SvgCanvasComponent implements OnInit {
       this.panStart = { x: event.clientX, y: event.clientY };
     } else if (this.draggingNode) {
       this.onDrag(event);
-    }else if (this.draggingFrom) {
-        // Update temporary connector position
-        const svgCoords = this.getSvgCoords(event);
-        this.tempConnector = { x: svgCoords.x, y: svgCoords.y };
+    } else if (this.draggingFrom) {
+      // Update temporary connector position
+      const svgCoords = this.getSvgCoords(event);
+      this.tempConnector = { x: svgCoords.x, y: svgCoords.y };
     }
   }
 
@@ -218,16 +244,16 @@ export class SvgCanvasComponent implements OnInit {
       // Complete the connection to the input port
       this.createConnector(this.draggingFrom, { nodeId, port });
       this.draggingFrom = null; // Reset dragging state
-    } 
+    }
   }
 
   createConnector(from: { nodeId: string; port: Port }, to: { nodeId: string; port: Port }) {
     const newConnector: Connector = {
-        fromNodeId: from.nodeId,
-        fromPortId: from.port.id,
-        toNodeId: to.nodeId,
-        toPortId: to.port.id,
-        id: `conn-${from.nodeId}-${to.nodeId}`
+      fromNodeId: from.nodeId,
+      fromPortId: from.port.id,
+      toNodeId: to.nodeId,
+      toPortId: to.port.id,
+      id: `conn-${from.nodeId}-${to.nodeId}`
     };
 
     // Update the connectors in the graph
@@ -235,7 +261,7 @@ export class SvgCanvasComponent implements OnInit {
     this.initialConnectors = JSON.parse(JSON.stringify(this.connectors()));
     this.initialNodes = JSON.parse(JSON.stringify(this.nodes()));
     console.log('Connector created:', newConnector);
-}
+  }
 
   getPortAbsolutePosition(nodeId: string, portId: string) {
     const node = this.nodes().find(n => n.id === nodeId);
@@ -312,5 +338,9 @@ export class SvgCanvasComponent implements OnInit {
       x: node.x + port.x,
       y: node.y + port.y
     };
+  }
+
+  ngOnDestroy(): void {
+    window.removeEventListener('keydown', this.onKeyDown.bind(this));
   }
 }
