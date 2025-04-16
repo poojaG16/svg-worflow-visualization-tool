@@ -24,24 +24,29 @@
         <defs>
             <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"
                 markerUnits="strokeWidth">
-                <polygon points="0 0, 10 3.5, 0 7" fill="black"/>
+                <polygon points="0 0, 10 3.5, 0 7" fill="black" />
             </marker>
         </defs>
 
 
         <!-- Bezier connectors -->
-        <path *ngFor="let conn of connectors()" [attr.d]="getBezierPath(conn)" [attr.stroke]="conn === selectedConnector ? 'red' : 'black'" [attr.stroke-width]="2"
-            fill="none" marker-end="url(#arrowhead)" (click)="selectConnector(conn)" />
+        <path *ngFor="let conn of connectors()" [attr.d]="getBezierPath(conn)"
+            [attr.stroke]="conn === selectedConnector ? 'red' : 'black'" [attr.stroke-width]="2" fill="none"
+            marker-end="url(#arrowhead)" (click)="selectConnector(conn)" />
 
         <path *ngIf="tempConnector"
             [attr.d]="'M' + getPortPosition(draggingFrom?.nodeId || '', draggingFrom?.port?.id || '').x + ',' + getPortPosition(draggingFrom?.nodeId || '', draggingFrom?.port?.id || '').y + ' L' + tempConnector.x + ',' + tempConnector.y"
-            stroke="blue" stroke-width="1" fill="none" stroke-dasharray="5,5"/>
+            stroke="blue" stroke-width="1" fill="none" stroke-dasharray="5,5" />
+
+        <app-context-menu [position]="contextMenuPosition" [visible]="contextMenuVisible" [options]="contextMenuOptions"
+            (close)="closeContextMenu()">
+        </app-context-menu>
 
         <!-- Nodes -->
         <g *ngFor="let node of nodes()">
             <!-- Render node box -->
             <circle [attr.cx]="node.x" [attr.cy]="node.y" [attr.r]="node.radius || 60" fill="#b79fed" stroke="black"
-                (mousedown)="startDrag($event, node)" />
+                (mousedown)="startDrag($event, node)" (contextmenu)="openContextMenu($event, node)" />
 
             <!-- Node name -->
             <text [attr.x]="node.x" [attr.y]="node.y" text-anchor="middle" font-size="12" fill="black">{{ node.name
@@ -55,3 +60,7 @@
 
     </g>
 </svg>
+
+<app-context-menu [position]="contextMenuPosition" [visible]="contextMenuVisible" [options]="contextMenuOptions"
+    (close)="closeContextMenu()">
+</app-context-menu>
